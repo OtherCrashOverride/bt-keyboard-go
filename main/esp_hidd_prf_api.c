@@ -92,16 +92,32 @@ uint16_t esp_hidd_get_version(void)
 	return HIDD_VERSION;
 }
 
-void esp_hidd_send_consumer_value(uint16_t conn_id, uint8_t key_cmd, bool key_pressed)
+void esp_hidd_send_gamepad_value(uint16_t conn_id, int8_t up_down, int8_t left_right, uint8_t buttons)
 {
-    uint8_t buffer[HID_CC_IN_RPT_LEN] = {0, 0};
-    if (key_pressed) {
-        ESP_LOGD(HID_LE_PRF_TAG, "hid_consumer_build_report");
-        hid_consumer_build_report(buffer, key_cmd);
+    uint8_t buffer[2] = {0};
+    if (up_down > 0)
+    {
+        buffer[0] = 0x01;
     }
+    else if (up_down < 0)
+    {
+        buffer[0] = 0x03;
+    }
+
+    if (left_right > 0)
+    {
+        buffer[0] |= 0x04;
+    }
+    else if (left_right < 0)
+    {
+        buffer[0] |= 0x0c;
+    }
+
+    buffer[1] = buttons;
+
     ESP_LOGD(HID_LE_PRF_TAG, "buffer[0] = %x, buffer[1] = %x", buffer[0], buffer[1]);
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT, HID_CC_IN_RPT_LEN, buffer);
+                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, 2, buffer);
     return;
 }
 
@@ -126,20 +142,20 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
     return;
 }
 
-void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y)
-{
-    uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
+// void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y)
+// {
+//     uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
     
-    buffer[0] = mouse_button;   // Buttons
-    buffer[1] = mickeys_x;           // X
-    buffer[2] = mickeys_y;           // Y
-    buffer[3] = 0;           // Wheel
-    buffer[4] = 0;           // AC Pan
+//     buffer[0] = mouse_button;   // Buttons
+//     buffer[1] = mickeys_x;           // X
+//     buffer[2] = mickeys_y;           // Y
+//     buffer[3] = 0;           // Wheel
+//     buffer[4] = 0;           // AC Pan
 
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);
-    return;
-}
+//     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
+//                         HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);
+//     return;
+// }
 
 
 

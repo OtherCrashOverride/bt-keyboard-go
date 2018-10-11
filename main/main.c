@@ -184,6 +184,15 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 }
 
 
+
+enum
+{
+    REPORT_READY_NONE = 0,
+    REPORT_READY_KEYBOARD = (1 << 0),
+    REPORT_READY_GAMEPAD = (1 << 1)
+};
+
+
 SemaphoreHandle_t keyboardMutex;
 
 // #define KEYBOARD_QUEUE_LENGTH (20)
@@ -196,6 +205,9 @@ uint8_t KeysPressed[KEYBOARD_PRESSED_MAX];
 key_mask_t special_key_mask;
 
 SemaphoreHandle_t reportReadySemaphore;
+uint8_t reportReadyType;
+
+odroid_gamepad_state gamepad_state;
 
 
 static uint8_t convert_key_to_hid(odroid_key_t key)
@@ -355,6 +367,22 @@ void keyboard_callback(odroid_keystate_t state, odroid_key_t key)
         }
     }
 
+    reportReadyType |= REPORT_READY_KEYBOARD;
+
+    xSemaphoreGive(keyboardMutex);
+    
+
+    // Wake sending thread
+    xSemaphoreGive(reportReadySemaphore);
+}
+
+void gamepad_callback(odroid_gamepad_state* out_state) 
+{
+    xSemaphoreTake(keyboardMutex, portMAX_DELAY);
+
+    gamepad_state = *out_state;
+    reportReadyType |= REPORT_READY_GAMEPAD;
+
     xSemaphoreGive(keyboardMutex);
     
 
@@ -391,9 +419,44 @@ void hid_demo_task(void *pvParameters)
                 abort();
             }
 
+
             xSemaphoreTake(keyboardMutex, portMAX_DELAY);
 
-            esp_hidd_send_keyboard_value(hid_conn_id, special_key_mask, KeysPressed, KEYBOARD_PRESSED_MAX);
+            if (reportReadyType & REPORT_READY_KEYBOARD)
+            {
+                esp_hidd_send_keyboard_value(hid_conn_id, special_key_mask, KeysPressed, KEYBOARD_PRESSED_MAX);
+            }
+
+            if (reportReadyType & REPORT_READY_GAMEPAD)
+            {
+                uint8_t up_down = 0;
+                uint8_t left_right = 0;
+                uint8_t buttons = 0;
+
+                if (gamepad_state.values[ODROID_INPUT_UP])
+                    up_down = -1;
+                else if (gamepad_state.values[ODROID_INPUT_DOWN])
+                    up_down = 1;
+                else
+                    up_down = 0;
+
+                if (gamepad_state.values[ODROID_INPUT_LEFT])
+                    left_right = -1;
+                else if (gamepad_state.values[ODROID_INPUT_RIGHT])
+                    left_right = 1;
+                else
+                    left_right = 0;
+
+                
+                if (gamepad_state.values[ODROID_INPUT_A]) buttons |= 1;
+                if (gamepad_state.values[ODROID_INPUT_B]) buttons |= 2;
+                if (gamepad_state.values[ODROID_INPUT_SELECT]) buttons |= 4;
+                if (gamepad_state.values[ODROID_INPUT_START]) buttons |= 8;
+
+                esp_hidd_send_gamepad_value(hid_conn_id, up_down, left_right, buttons);
+            }
+
+            reportReadyType = REPORT_READY_NONE;
 
             xSemaphoreGive(keyboardMutex);        
         }
@@ -437,6 +500,8 @@ void app_main()
 
 	odroid_keyboard_event_callback_set(&keyboard_callback);
 	odroid_keyboard_init();
+
+    odroid_input_event_callback_set(&gamepad_callback);
 
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));

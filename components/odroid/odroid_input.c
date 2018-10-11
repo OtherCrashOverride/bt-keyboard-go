@@ -33,6 +33,9 @@ static int BacklightLevel = BACKLIGHT_LEVEL_COUNT - 1;
 
 int is_backlight_initialized();
 
+static odroid_gamepad_callback odroid_gamepad_event_fn;
+
+
 odroid_gamepad_state odroid_input_read_raw()
 {
     odroid_gamepad_state state = {0};
@@ -240,6 +243,14 @@ static void odroid_input_task(void *arg)
             }
         }
 
+        if (odroid_gamepad_event_fn)
+        {
+            if (memcmp(&previous_gamepad_state, &gamepad_state, sizeof(gamepad_state)) != 0)
+            {
+                odroid_gamepad_event_fn(&gamepad_state);
+            }
+        }
+
         previous_gamepad_state = gamepad_state;
 
         xSemaphoreGive(xSemaphore);
@@ -317,6 +328,11 @@ void odroid_input_gamepad_read(odroid_gamepad_state* out_state)
     *out_state = gamepad_state;
 
     xSemaphoreGive(xSemaphore);
+}
+
+void odroid_input_event_callback_set(odroid_gamepad_callback callback)
+{
+    odroid_gamepad_event_fn = callback;
 }
 
 

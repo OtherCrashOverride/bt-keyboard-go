@@ -40,10 +40,13 @@ typedef struct
 	int percentage;
 } odroid_battery_state;
 
+typedef void (*odroid_gamepad_callback)(odroid_gamepad_state* out_state) ;
+
 void odroid_input_gamepad_init();
 void odroid_input_gamepad_terminate();
 void odroid_input_gamepad_read(odroid_gamepad_state* out_state);
 odroid_gamepad_state odroid_input_read_raw();
+void odroid_input_event_callback_set(odroid_gamepad_callback callback);
 
 void odroid_input_battery_level_init();
 void odroid_input_battery_level_read(odroid_battery_state* out_state);
