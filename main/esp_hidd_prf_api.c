@@ -95,20 +95,20 @@ uint16_t esp_hidd_get_version(void)
 void esp_hidd_send_gamepad_value(uint16_t conn_id, int8_t up_down, int8_t left_right, uint8_t buttons)
 {
     uint8_t buffer[2] = {0};
-    if (up_down > 0)
+    if (left_right > 0)
     {
         buffer[0] = 0x01;
     }
-    else if (up_down < 0)
+    else if (left_right < 0)
     {
         buffer[0] = 0x03;
     }
 
-    if (left_right > 0)
+    if (up_down > 0)
     {
         buffer[0] |= 0x04;
     }
-    else if (left_right < 0)
+    else if (up_down < 0)
     {
         buffer[0] |= 0x0c;
     }
