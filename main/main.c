@@ -487,21 +487,25 @@ void app_main()
     ESP_ERROR_CHECK( ret );
 
 
-    odroid_system_init();
-    odroid_input_gamepad_init();
-    odroid_input_battery_level_init();
-
-
 	keyboardMutex = xSemaphoreCreateMutex();
 	if(keyboardMutex == NULL) abort();
 
     reportReadySemaphore = xSemaphoreCreateBinary();
     if(reportReadySemaphore == NULL) abort();
 
-	odroid_keyboard_event_callback_set(&keyboard_callback);
-	odroid_keyboard_init();
+
+    odroid_system_init();
 
     odroid_input_event_callback_set(&gamepad_callback);
+    odroid_input_gamepad_init();
+
+    odroid_input_battery_level_init();
+
+	odroid_keyboard_event_callback_set(&keyboard_callback);
+	if (!odroid_keyboard_init())
+    {
+        ESP_LOGI(HID_DEMO_TAG, "%s keyboard not detected\n", __func__);
+    }
 
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
@@ -509,30 +513,30 @@ void app_main()
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     ret = esp_bt_controller_init(&bt_cfg);
     if (ret) {
-        ESP_LOGE(HID_DEMO_TAG, "%s initialize controller failed\n", __func__);
+        ESP_LOGE(HID_DEMO_TAG, "%s esp_bt_controller_init failed\n", __func__);
         return;
     }
 
     ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
     if (ret) {
-        ESP_LOGE(HID_DEMO_TAG, "%s enable controller failed\n", __func__);
+        ESP_LOGE(HID_DEMO_TAG, "%s esp_bt_controller_enable failed\n", __func__);
         return;
     }
 
     ret = esp_bluedroid_init();
     if (ret) {
-        ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
+        ESP_LOGE(HID_DEMO_TAG, "%s esp_bluedroid_init failed\n", __func__);
         return;
     }
 
     ret = esp_bluedroid_enable();
     if (ret) {
-        ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
+        ESP_LOGE(HID_DEMO_TAG, "%s esp_bluedroid_enable failed\n", __func__);
         return;
     }
 
     if((ret = esp_hidd_profile_init()) != ESP_OK) {
-        ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
+        ESP_LOGE(HID_DEMO_TAG, "%s esp_hidd_profile_init failed\n", __func__);
     }
 
     ///register the callback function to the gap module
