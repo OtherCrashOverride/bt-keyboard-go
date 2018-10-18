@@ -31,6 +31,11 @@
 #include "../components/odroid/odroid_system.h"
 #include "../components/odroid/odroid_keyboard.h"
 
+//#include "../components/ugui/ugui.h"
+
+//uint16_t fb[320 * 240];
+//UG_GUI gui;
+
 /**
  * Brief:
  * This test code shows how to configure gpio and how to use gpio interrupt.
@@ -59,7 +64,9 @@ static bool send_volum_up = false;
 
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
 
-#define HIDD_DEVICE_NAME            "ODROID-GO"
+#define HIDD_DEVICE_NAME            "ODROID-GO-"
+static char* device_name;
+
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     //first uuid, 16bit, [12],[13] is the value
@@ -121,9 +128,9 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
                 //esp_bd_addr_t rand_addr = {0x04,0x11,0x11,0x11,0x11,0x05};
-                esp_ble_gap_set_device_name(HIDD_DEVICE_NAME);
+                esp_ble_gap_set_device_name(device_name);
                 esp_ble_gap_config_adv_data(&hidd_adv_data);
-                ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_REG_FINISH HIDD_DEVICE_NAME=%s", HIDD_DEVICE_NAME);
+                //ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_REG_FINISH HIDD_DEVICE_NAME=%s", device_name);
             }
             break;
         }
@@ -468,8 +475,10 @@ void hid_demo_task(void *pvParameters)
             // keyboardQueueCount = 0;)
                         
             // xSemaphoreGive(keyboardMutex);
+
+            vTaskDelay(1 / portTICK_PERIOD_MS);
         }
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        
     }
 }
 
@@ -485,6 +494,17 @@ void app_main()
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK( ret );
+
+
+    uint8_t mac[6];   // base MAC address, length: 6 bytes.
+    ret = esp_efuse_mac_get_default(&mac);
+    ESP_ERROR_CHECK( ret );
+
+    device_name = malloc(strlen(HIDD_DEVICE_NAME) + 11 + 1); // Name + 4 hex bytes + zero termination
+    if (!device_name) abort();
+
+    sprintf(device_name, "%s%02X-%02X-%02X-%02X", HIDD_DEVICE_NAME, mac[2], mac[3], mac[4], mac[5]);
+    printf("device_name='%s'", device_name);
 
 
 	keyboardMutex = xSemaphoreCreateMutex();
@@ -560,7 +580,62 @@ void app_main()
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
 
     //init the gpio pin
-    xTaskCreate(&hid_demo_task, "hid_task", 2048, NULL, 5, NULL);
+    //xTaskCreate(&hid_demo_task, "hid_task", 2048, NULL, 5, NULL);
 
+    while(1)
+    {
+        if (sec_conn)
+        {
+            // Wait for an event to report
+            if(xSemaphoreTake(reportReadySemaphore, portMAX_DELAY) != pdTRUE )  abort();
+ 
+
+            // Send the report(s)
+            xSemaphoreTake(keyboardMutex, portMAX_DELAY);
+
+            if (reportReadyType & REPORT_READY_KEYBOARD)
+            {
+                esp_hidd_send_keyboard_value(hid_conn_id, special_key_mask, KeysPressed, KEYBOARD_PRESSED_MAX);
+            }
+
+            if (reportReadyType & REPORT_READY_GAMEPAD)
+            {
+                uint8_t up_down = 0;
+                uint8_t left_right = 0;
+                uint8_t buttons = 0;
+
+                if (gamepad_state.values[ODROID_INPUT_UP])
+                    up_down = -1;
+                else if (gamepad_state.values[ODROID_INPUT_DOWN])
+                    up_down = 1;
+                else
+                    up_down = 0;
+
+                if (gamepad_state.values[ODROID_INPUT_LEFT])
+                    left_right = -1;
+                else if (gamepad_state.values[ODROID_INPUT_RIGHT])
+                    left_right = 1;
+                else
+                    left_right = 0;
+
+                
+                if (gamepad_state.values[ODROID_INPUT_A]) buttons |= 1;
+                if (gamepad_state.values[ODROID_INPUT_B]) buttons |= 2;
+                if (gamepad_state.values[ODROID_INPUT_SELECT]) buttons |= 4;
+                if (gamepad_state.values[ODROID_INPUT_START]) buttons |= 8;
+
+                esp_hidd_send_gamepad_value(hid_conn_id, up_down, left_right, buttons);
+            }
+
+            reportReadyType = REPORT_READY_NONE;
+
+            xSemaphoreGive(keyboardMutex);        
+        }
+        else
+        {
+            vTaskDelay(1);
+        }
+        
+    }
 }
 
