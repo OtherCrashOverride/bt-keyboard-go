@@ -432,7 +432,7 @@ static void backlight_init()
     //set LEDC channel 0
     ledc_channel.channel = LEDC_CHANNEL_0;
     //set the duty for initialization.(duty range is 0 ~ ((2**bit_num)-1)
-    ledc_channel.duty = (LCD_BACKLIGHT_ON_VALUE) ? 0 : DUTY_MAX;
+    ledc_channel.duty = DUTY_MAX;
     //GPIO number
     ledc_channel.gpio_num = LCD_PIN_NUM_BCKL;
     //GPIO INTR TYPE, as an example, we enable fade_end interrupt here.
@@ -447,20 +447,6 @@ static void backlight_init()
     err = ledc_channel_config(&ledc_channel);
     if (err != ESP_OK) abort();
 
-#if 0
-    //initialize fade service.
-    ledc_fade_func_install(0);
-
-    // duty range is 0 ~ ((2**bit_num)-1)
-    ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, (LCD_BACKLIGHT_ON_VALUE) ? DUTY_MAX : 0, 500);
-    ledc_fade_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, LEDC_FADE_NO_WAIT);
-#else
-    err = ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, DUTY_MAX);
-    if (err != ESP_OK) abort();
-
-    err = ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    if (err != ESP_OK) abort();
-#endif
 
     isBackLightIntialized = true;
 }

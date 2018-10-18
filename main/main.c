@@ -30,11 +30,18 @@
 #include "../components/odroid/odroid_input.h"
 #include "../components/odroid/odroid_system.h"
 #include "../components/odroid/odroid_keyboard.h"
+#include "../components/odroid/odroid_display.h"
 
-//#include "../components/ugui/ugui.h"
 
-//uint16_t fb[320 * 240];
-//UG_GUI gui;
+#include "../components/ugui/ugui.h"
+
+uint16_t* fb; //[320 * 240];
+UG_GUI gui;
+
+static void pset(UG_S16 x, UG_S16 y, UG_COLOR color)
+{
+    fb[y * 320 + x] = color;
+}
 
 /**
  * Brief:
@@ -482,10 +489,19 @@ void hid_demo_task(void *pvParameters)
     }
 }
 
+static void ui_update_display()
+{
+    ili9341_write_frame_rectangleLE(0, 0, 320, 240, fb);
+}
 
 void app_main()
 {
     esp_err_t ret;
+
+
+    fb = heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_SPIRAM);
+    if (!fb) abort();
+
 
     // Initialize NVS.
     ret = nvs_flash_init();
@@ -581,6 +597,24 @@ void app_main()
 
     //init the gpio pin
     //xTaskCreate(&hid_demo_task, "hid_task", 2048, NULL, 5, NULL);
+
+    ili9341_init();
+    ili9341_clear(0xffff);
+
+    UG_Init(&gui, pset, 320, 240);
+
+    UG_FillFrame(0, 0, 319, 239, C_WHITE);
+
+    // Header
+    UG_FillFrame(0, 0, 319, 15, C_MIDNIGHT_BLUE);
+    UG_FontSelect(&FONT_8X8);
+    const short titleLeft = (320 / 2) - (strlen(device_name) * 9 / 2);
+    UG_SetForecolor(C_WHITE);
+    UG_SetBackcolor(C_MIDNIGHT_BLUE);
+    UG_PutString(titleLeft, 4, device_name);
+
+    ui_update_display();
+
 
     while(1)
     {
